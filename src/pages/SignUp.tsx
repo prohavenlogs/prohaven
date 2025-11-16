@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { sendEmail, emailTemplates } from "@/lib/email";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import PageTransition from "@/components/PageTransition";
 import { Wallet, CheckCircle2, Mail } from "lucide-react";
@@ -89,23 +89,18 @@ const SignUp = () => {
         setUserEmail(email);
         setStep("confirmation");
 
-        // Send welcome email
+        // Send welcome email using Resend
         try {
-          await supabase.functions.invoke("send-email", {
-            body: {
-              to: email,
-              subject: "Welcome to ProHavenLogs - Confirm Your Email!",
-              html: `
-                <h1>Welcome to ProHavenLogs, ${fullName}!</h1>
-                <p>Thank you for creating your account with your Web3 wallet.</p>
-                <p>Please confirm your email address to complete your registration.</p>
-                <p>Click the confirmation link we sent to your email to get started.</p>
-                <br/>
-                <p>Best regards,<br/>The ProHavenLogs Team</p>
-              `,
-              emailType: "verification",
-            },
+          const template = emailTemplates.welcome(fullName);
+          const result = await sendEmail({
+            to: email,
+            subject: template.subject,
+            html: template.html,
           });
+
+          if (!result.success) {
+            console.error("Failed to send welcome email:", result.error);
+          }
         } catch (emailError) {
           console.error("Failed to send welcome email:", emailError);
         }
