@@ -348,8 +348,8 @@ const SignUp = () => {
                   Didn't receive the email?{" "}
                   <button
                     onClick={() => {
-                      setStep("wallet");
-                      disconnect();
+                      setStep("details");
+                      // Don't disconnect wallet - let user retry with same wallet
                       setFormData({ fullName: "", email: "" });
                     }}
                     className="text-neon-blue hover:text-neon-pink transition-colors"

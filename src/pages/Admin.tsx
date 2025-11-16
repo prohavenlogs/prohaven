@@ -7,6 +7,7 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminWallets } from "@/components/admin/AdminWallets";
 import { AdminWalletAddresses } from "@/components/admin/AdminWalletAddresses";
 import { AdminLogin } from "@/components/admin/AdminLogin";
+import LogoutButton from "@/components/LogoutButton";
 
 const Admin = () => {
   const { isAdmin, loading } = useAdminCheck();
@@ -42,6 +43,7 @@ const Admin = () => {
                 </p>
               </div>
             </div>
+            <LogoutButton />
           </div>
         </div>
 

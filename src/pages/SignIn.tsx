@@ -35,7 +35,7 @@ const SignIn = () => {
 
           if (error) {
             toast.error(error.message || "Wallet not registered. Please sign up first.");
-            disconnect();
+            // Don't disconnect wallet on auth failure - let user retry with same wallet
             setShowWallets(false);
           } else {
             toast.success("Welcome back!");
@@ -44,7 +44,7 @@ const SignIn = () => {
         } catch (error: any) {
           toast.error("An unexpected error occurred");
           console.error("Sign in error:", error);
-          disconnect();
+          // Don't disconnect wallet on error - let user retry
         } finally {
           setIsSubmitting(false);
         }
@@ -52,7 +52,7 @@ const SignIn = () => {
     };
 
     handleWalletSignIn();
-  }, [isConnected, address, user, signInWithWallet, navigate, disconnect, isSubmitting]);
+  }, [isConnected, address, user, signInWithWallet, navigate, isSubmitting]);
 
   const handleConnect = async (connector: any) => {
     try {

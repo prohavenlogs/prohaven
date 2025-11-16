@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PageTransition from "@/components/PageTransition";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import WalletManagement from "@/components/WalletManagement";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -77,66 +78,75 @@ const Profile = () => {
   return (
     <DashboardLayout balance="0.00">
       <PageTransition>
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
           <h1 className="text-3xl font-bold text-card-foreground mb-6">Profile Settings</h1>
 
-          <Card className="rounded-3xl shadow-card p-8 border border-border/20">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-muted-foreground">
-                  Full Name
-                </Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="h-12 rounded-full"
-                  aria-label="Full name"
-                />
-              </div>
+          <div className="space-y-8">
+            {/* Profile Information Card */}
+            <Card className="rounded-3xl shadow-card p-8 border border-border/20">
+              <h2 className="text-xl font-semibold text-card-foreground mb-6">Personal Information</h2>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="text-muted-foreground">
+                    Full Name
+                  </Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="h-12 rounded-full"
+                    aria-label="Full name"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-muted-foreground">
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 rounded-full"
-                  aria-label="Email address"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-muted-foreground">
+                    Email Address
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-full"
+                    aria-label="Email address"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Account ID</Label>
-                <Input
-                  value={user?.id || ""}
-                  disabled
-                  className="h-12 rounded-full bg-muted border-0 text-muted-foreground"
-                  aria-label="Account ID (read-only)"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Account ID</Label>
+                  <Input
+                    value={user?.id || ""}
+                    disabled
+                    className="h-12 rounded-full bg-muted border-0 text-muted-foreground"
+                    aria-label="Account ID (read-only)"
+                  />
+                </div>
 
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full h-12 rounded-full gradient-primary text-black font-semibold shadow-glow relative overflow-hidden group"
-                aria-label="Save profile changes"
-              >
-                {isSaving ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span className="ml-2">Saving...</span>
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
-              </Button>
-            </div>
-          </Card>
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="w-full h-12 rounded-full gradient-primary text-black font-semibold shadow-glow relative overflow-hidden group"
+                  aria-label="Save profile changes"
+                >
+                  {isSaving ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      <span className="ml-2">Saving...</span>
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+                </Button>
+              </div>
+            </Card>
+
+            {/* Wallet Management Card */}
+            <Card className="rounded-3xl shadow-card p-8 border border-border/20">
+              <WalletManagement />
+            </Card>
+          </div>
         </div>
       </PageTransition>
     </DashboardLayout>

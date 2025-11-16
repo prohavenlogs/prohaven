@@ -65,7 +65,7 @@ export const DepositModal = ({ open, onOpenChange, onSuccess }: DepositModalProp
                 <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-neon-blue/20 text-neon-blue font-semibold text-xs">
                   1
                 </span>
-                <span>Open your wallet app (MetaMask, Trust Wallet, etc.)</span>
+                <span>Open your wallet app (MetaMask, Trust Wallet, Coinbase Wallet, or any supported wallet)</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-neon-blue/20 text-neon-blue font-semibold text-xs">
@@ -107,6 +107,22 @@ export const DepositModal = ({ open, onOpenChange, onSuccess }: DepositModalProp
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Trust Wallet Help
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => window.open('https://help.coinbase.com/en/wallet', '_blank')}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Coinbase Wallet Help
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => window.open('https://walletconnect.com/faq', '_blank')}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                WalletConnect FAQ
               </Button>
             </div>
           </div>

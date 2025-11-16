@@ -172,6 +172,7 @@ export type Database = {
           status: string
           updated_at: string | null
           user_id: string
+          wallet_address: string | null
         }
         Insert: {
           amount: number
@@ -183,6 +184,7 @@ export type Database = {
           status: string
           updated_at?: string | null
           user_id: string
+          wallet_address?: string | null
         }
         Update: {
           amount?: number
@@ -194,6 +196,7 @@ export type Database = {
           status?: string
           updated_at?: string | null
           user_id?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }
@@ -243,6 +246,7 @@ export type Database = {
           role: string | null
           telegram_handle: string | null
           updated_at: string | null
+          wallet_address: string | null
           wallet_balance: number | null
         }
         Insert: {
@@ -254,6 +258,7 @@ export type Database = {
           role?: string | null
           telegram_handle?: string | null
           updated_at?: string | null
+          wallet_address?: string | null
           wallet_balance?: number | null
         }
         Update: {
@@ -265,6 +270,7 @@ export type Database = {
           role?: string | null
           telegram_handle?: string | null
           updated_at?: string | null
+          wallet_address?: string | null
           wallet_balance?: number | null
         }
         Relationships: []
@@ -281,6 +287,7 @@ export type Database = {
           type: string
           updated_at: string | null
           user_id: string
+          wallet_address: string | null
         }
         Insert: {
           amount: number
@@ -293,6 +300,7 @@ export type Database = {
           type: string
           updated_at?: string | null
           user_id: string
+          wallet_address?: string | null
         }
         Update: {
           amount?: number
@@ -305,6 +313,7 @@ export type Database = {
           type?: string
           updated_at?: string | null
           user_id?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }
@@ -326,6 +335,36 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_wallets: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          nickname: string | null
+          updated_at: string | null
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          nickname?: string | null
+          updated_at?: string | null
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          nickname?: string | null
+          updated_at?: string | null
+          user_id?: string
+          wallet_address?: string
         }
         Relationships: []
       }
@@ -380,6 +419,23 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { p_user_id: string }; Returns: boolean }
+      link_wallet: {
+        Args: {
+          p_is_primary?: boolean
+          p_nickname?: string
+          p_user_id: string
+          p_wallet_address: string
+        }
+        Returns: Json
+      }
+      set_primary_wallet: {
+        Args: { p_user_id: string; p_wallet_id: string }
+        Returns: undefined
+      }
+      get_user_by_wallet: {
+        Args: { p_wallet_address: string }
+        Returns: { email: string; is_primary: boolean; user_id: string }[]
+      }
       update_wallet_balance: {
         Args: { p_amount: number; p_type: string; p_user_id: string }
         Returns: undefined
