@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search, CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Search, CheckCircle, XCircle, AlertCircle, Loader2, ArrowDownCircle } from "lucide-react";
 import { toast } from "sonner";
 
-interface Transaction {
+interface Deposit {
   id: string;
   user_id: string;
   user_email?: string;
@@ -24,56 +24,64 @@ interface Transaction {
 
 export const AdminWallets = () => {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
-    fetchTransactions();
+    fetchDeposits();
   }, []);
 
-  const fetchTransactions = async () => {
+  const fetchDeposits = async () => {
     try {
+      // Fetch only deposit transactions
       const { data: txData, error: txError } = await supabase
         .from("transactions")
         .select("*")
+        .eq("type", "deposit")
         .order("created_at", { ascending: false });
 
       if (txError) throw txError;
 
       // Fetch all unique user emails
       const userIds = [...new Set(txData?.map(t => t.user_id) || [])];
-      const { data: profiles, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .in("id", userIds);
 
-      if (profileError) throw profileError;
+      if (userIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .in("id", userIds);
 
-      // Map emails to transactions
-      const emailMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
-      const transactionsWithEmail = txData?.map(t => ({
-        ...t,
-        user_email: emailMap.get(t.user_id) || "N/A"
-      })) || [];
-      
-      setTransactions(transactionsWithEmail);
+        if (profileError) throw profileError;
+
+        // Map emails to deposits
+        const emailMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
+        const depositsWithEmail = txData?.map(t => ({
+          ...t,
+          user_email: emailMap.get(t.user_id) || "N/A"
+        })) || [];
+
+        setDeposits(depositsWithEmail);
+      } else {
+        setDeposits([]);
+      }
     } catch (error) {
-      console.error("Error fetching transactions:", error);
-      toast.error("Failed to fetch transactions");
+      console.error("Error fetching deposits:", error);
+      toast.error("Failed to fetch deposits");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateTransactionStatus = async (transactionId: string, newStatus: string) => {
+  const updateDepositStatus = async (depositId: string, newStatus: string) => {
     if (!user) return;
-    
-    setUpdatingStatus(transactionId);
+
+    setUpdatingStatus(depositId);
     try {
       const { data, error } = await supabase.rpc("admin_set_transaction_status", {
-        p_tx_id: transactionId,
+        p_tx_id: depositId,
         p_new_status: newStatus,
         p_admin_id: user.id,
       });
@@ -82,7 +90,7 @@ export const AdminWallets = () => {
         if (error.message?.includes("PERMISSION_DENIED")) {
           toast.error("You don't have permission to perform this action");
         } else if (error.message?.includes("INSUFFICIENT_BALANCE_TO_REVERSE")) {
-          toast.error("Cannot reverse transaction - user has insufficient balance");
+          toast.error("Cannot reverse deposit - user has insufficient balance");
         } else {
           throw error;
         }
@@ -90,41 +98,54 @@ export const AdminWallets = () => {
       }
 
       const result = data as { success: boolean; old_status: string; new_status: string };
-      toast.success(`Status changed from ${result.old_status} to ${result.new_status}`);
-      
-      // Refetch transactions to ensure balance is reflected correctly
-      fetchTransactions();
+      toast.success(`Deposit status changed from ${result.old_status} to ${result.new_status}`);
+
+      // Refetch deposits to ensure balance is reflected correctly
+      fetchDeposits();
     } catch (error) {
-      console.error("Error updating transaction status:", error);
-      toast.error("Failed to update transaction status");
+      console.error("Error updating deposit status:", error);
+      toast.error("Failed to update deposit status");
     } finally {
       setUpdatingStatus(null);
     }
   };
 
-  const filteredTransactions = useMemo(() => {
-    if (!searchQuery) return transactions;
+  // Filter deposits based on search and status
+  const filteredDeposits = useMemo(() => {
+    return deposits.filter(deposit => {
+      const matchesSearch = !searchQuery ||
+        deposit.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        deposit.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        deposit.crypto_currency?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        deposit.reference_id?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return transactions.filter(t =>
-      t.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.crypto_currency?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [transactions, searchQuery]);
+      const matchesStatus = statusFilter === "all" || deposit.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [deposits, searchQuery, statusFilter]);
 
   // Separate pending deposits for quick access
   const pendingDeposits = useMemo(() => {
-    return filteredTransactions.filter(t => t.type === "deposit" && t.status === "pending");
-  }, [filteredTransactions]);
+    return deposits.filter(d => d.status === "pending");
+  }, [deposits]);
 
-  const getPaymentMethodDisplay = (tx: Transaction) => {
-    return tx.crypto_currency || "Crypto";
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, string> = {
+      pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+      completed: "bg-green-500/20 text-green-400 border-green-500/30",
+      failed: "bg-red-500/20 text-red-400 border-red-500/30",
+    };
+
+    return (
+      <Badge variant="outline" className={variants[status] || "bg-gray-500/20 text-gray-400"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading transactions...</div>;
+    return <div className="text-center py-8">Loading deposits...</div>;
   }
 
   return (
@@ -140,7 +161,7 @@ export const AdminWallets = () => {
               </h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              These deposits require your review and approval.
+              These deposits require your review and approval. Approving will credit the user's balance.
             </p>
 
             <div className="space-y-3">
@@ -149,7 +170,7 @@ export const AdminWallets = () => {
                   key={deposit.id}
                   className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/30"
                 >
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">User</p>
                       <p className="font-medium text-foreground">{deposit.user_email}</p>
@@ -160,7 +181,13 @@ export const AdminWallets = () => {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Currency</p>
-                      <p className="font-medium text-orange-400">{deposit.crypto_currency}</p>
+                      <p className="font-medium text-orange-400">{deposit.crypto_currency || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Date</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(deposit.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
@@ -168,7 +195,7 @@ export const AdminWallets = () => {
                       size="sm"
                       variant="outline"
                       className="border-green-500/50 text-green-500 hover:bg-green-500/10"
-                      onClick={() => updateTransactionStatus(deposit.id, "completed")}
+                      onClick={() => updateDepositStatus(deposit.id, "completed")}
                       disabled={updatingStatus === deposit.id}
                     >
                       {updatingStatus === deposit.id ? (
@@ -184,7 +211,7 @@ export const AdminWallets = () => {
                       size="sm"
                       variant="outline"
                       className="border-red-500/50 text-red-500 hover:bg-red-500/10"
-                      onClick={() => updateTransactionStatus(deposit.id, "failed")}
+                      onClick={() => updateDepositStatus(deposit.id, "failed")}
                       disabled={updatingStatus === deposit.id}
                     >
                       {updatingStatus === deposit.id ? (
@@ -204,130 +231,115 @@ export const AdminWallets = () => {
         </Card>
       )}
 
-      {/* All Transactions */}
+      {/* All Deposits */}
       <Card className="glass-card border-border/50 rounded-lg shadow-glow">
         <div className="p-6 border-b border-border/50">
-          <h2 className="text-xl font-semibold text-foreground">All Transactions</h2>
-          <p className="text-sm text-muted-foreground mt-1">View all wallet deposits, spends, and adjustments</p>
+          <div className="flex items-center gap-2 mb-2">
+            <ArrowDownCircle className="w-5 h-5 text-neon-blue" />
+            <h2 className="text-xl font-semibold text-foreground">All Deposits</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">View and manage all user deposit requests</p>
 
-          <div className="mt-4">
-            <div className="relative">
+          {/* Filters */}
+          <div className="mt-4 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search by email, ID, type, or currency..."
+                placeholder="Search by email, ID, or currency..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="completed">Approved</SelectItem>
+                <SelectItem value="failed">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border/50 hover:bg-muted/5">
-              <TableHead className="text-foreground">User Email</TableHead>
-              <TableHead className="text-foreground">Type</TableHead>
-              <TableHead className="text-foreground">Amount</TableHead>
-              <TableHead className="text-foreground">Payment Method</TableHead>
-              <TableHead className="text-foreground">Reference/Sender</TableHead>
-              <TableHead className="text-foreground">Status</TableHead>
-              <TableHead className="text-foreground">Date</TableHead>
-              <TableHead className="text-foreground">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  Loading transactions...
-                </TableCell>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/50 hover:bg-muted/5">
+                <TableHead className="text-foreground">User Email</TableHead>
+                <TableHead className="text-foreground">Amount</TableHead>
+                <TableHead className="text-foreground">Currency</TableHead>
+                <TableHead className="text-foreground">Reference</TableHead>
+                <TableHead className="text-foreground">Status</TableHead>
+                <TableHead className="text-foreground">Date</TableHead>
+                <TableHead className="text-foreground">Actions</TableHead>
               </TableRow>
-            ) : transactions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  No transactions found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredTransactions.map((transaction) => (
-                <TableRow key={transaction.id} className="border-border/30 hover:bg-muted/5">
-                  <TableCell className="text-sm text-foreground">
-                    {transaction.user_email}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={transaction.type === "deposit" ? "default" : "secondary"}
-                      className={
-                        transaction.type === "deposit"
-                          ? "bg-green-500/20 text-green-500"
-                          : "bg-red-500/20 text-red-500"
-                      }
-                    >
-                      {transaction.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-semibold text-neon-blue">
-                    ${Number(transaction.amount).toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="bg-orange-500/10 text-orange-400 border-orange-500/30"
-                    >
-                      {getPaymentMethodDisplay(transaction)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px]">
-                    <div className="space-y-1">
-                      {transaction.reference_id && (
-                        <div className="truncate" title={transaction.reference_id}>
-                          <span className="text-xs text-muted-foreground">Tx: </span>
-                          <span className="font-mono text-xs">{transaction.reference_id.slice(0, 16)}...</span>
-                        </div>
-                      )}
-                      {!transaction.reference_id && "-"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={transaction.status === "confirmed" || transaction.status === "completed" ? "default" : "secondary"}
-                      className={
-                        transaction.status === "confirmed" || transaction.status === "completed"
-                          ? "bg-green-500/20 text-green-500"
-                          : "bg-yellow-500/20 text-yellow-500"
-                      }
-                    >
-                      {transaction.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(transaction.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={transaction.status}
-                      onValueChange={(value) => updateTransactionStatus(transaction.id, value)}
-                      disabled={updatingStatus === transaction.id}
-                    >
-                      <SelectTrigger className="w-[130px] h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                      </SelectContent>
-                    </Select>
+            </TableHeader>
+            <TableBody>
+              {filteredDeposits.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No deposits found
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                filteredDeposits.map((deposit) => (
+                  <TableRow key={deposit.id} className="border-border/30 hover:bg-muted/5">
+                    <TableCell className="text-sm text-foreground">
+                      {deposit.user_email}
+                    </TableCell>
+                    <TableCell className="font-semibold text-neon-blue">
+                      ${Number(deposit.amount).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="bg-orange-500/10 text-orange-400 border-orange-500/30"
+                      >
+                        {deposit.crypto_currency || "N/A"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                      {deposit.reference_id ? (
+                        <div className="truncate" title={deposit.reference_id}>
+                          <span className="font-mono text-xs">{deposit.reference_id.slice(0, 20)}...</span>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(deposit.status)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(deposit.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={deposit.status}
+                        onValueChange={(value) => updateDepositStatus(deposit.id, value)}
+                        disabled={updatingStatus === deposit.id}
+                      >
+                        <SelectTrigger className="w-[130px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="completed">Approved</SelectItem>
+                          <SelectItem value="failed">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   );
