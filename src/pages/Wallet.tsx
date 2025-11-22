@@ -152,12 +152,11 @@ const Wallet = () => {
 
   // Get payment method display info
   const getPaymentMethodInfo = (tx: any) => {
-    const paymentMethod = tx.payment_method;
     const cryptoCurrency = tx.crypto_currency;
 
     // Crypto payments (from admin wallet addresses)
-    if (paymentMethod === "crypto" || cryptoCurrency) {
-      return { label: cryptoCurrency || "Crypto", icon: Bitcoin, color: "text-orange-400" };
+    if (cryptoCurrency) {
+      return { label: cryptoCurrency, icon: Bitcoin, color: "text-orange-400" };
     }
     return { label: "Balance", icon: WalletIcon, color: "text-muted-foreground" };
   };

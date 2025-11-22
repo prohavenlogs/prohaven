@@ -17,9 +17,7 @@ interface Transaction {
   type: string;
   amount: number;
   crypto_currency: string;
-  payment_method: string | null;
   reference_id: string | null;
-  sender_info: string | null;
   status: string;
   created_at: string;
 }
@@ -111,10 +109,8 @@ export const AdminWallets = () => {
       t.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.crypto_currency.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.crypto_currency?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [transactions, searchQuery]);
 
@@ -124,15 +120,6 @@ export const AdminWallets = () => {
   }, [filteredTransactions]);
 
   const getPaymentMethodDisplay = (tx: Transaction) => {
-    if (tx.payment_method) {
-      const methodNames: Record<string, string> = {
-        cashapp: "Cash App",
-        zelle: "Zelle",
-        venmo: "Venmo",
-        paypal: "PayPal",
-      };
-      return methodNames[tx.payment_method] || tx.payment_method;
-    }
     return tx.crypto_currency || "Crypto";
   };
 
@@ -288,11 +275,7 @@ export const AdminWallets = () => {
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={
-                        transaction.payment_method
-                          ? "bg-green-500/10 text-green-400 border-green-500/30"
-                          : "bg-orange-500/10 text-orange-400 border-orange-500/30"
-                      }
+                      className="bg-orange-500/10 text-orange-400 border-orange-500/30"
                     >
                       {getPaymentMethodDisplay(transaction)}
                     </Badge>

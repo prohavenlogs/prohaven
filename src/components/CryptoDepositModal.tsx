@@ -137,7 +137,6 @@ export const CryptoDepositModal = ({
         type: "deposit",
         amount: parseFloat(amount),
         crypto_currency: selectedCurrency.currency,
-        payment_method: "crypto",
         reference_id: transactionHash || `deposit_${Date.now()}`,
         status: "pending",
       };
