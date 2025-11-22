@@ -16,6 +16,9 @@ interface Transaction {
   type: string;
   amount: number;
   crypto_currency: string;
+  payment_method: string | null;
+  reference_id: string | null;
+  sender_info: string | null;
   status: string;
   created_at: string;
 }
@@ -102,14 +105,30 @@ export const AdminWallets = () => {
 
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return transactions;
-    
-    return transactions.filter(t => 
+
+    return transactions.filter(t =>
       t.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.crypto_currency.toLowerCase().includes(searchQuery.toLowerCase())
+      t.crypto_currency.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [transactions, searchQuery]);
+
+  const getPaymentMethodDisplay = (tx: Transaction) => {
+    if (tx.payment_method) {
+      const methodNames: Record<string, string> = {
+        cashapp: "Cash App",
+        zelle: "Zelle",
+        venmo: "Venmo",
+        paypal: "PayPal",
+      };
+      return methodNames[tx.payment_method] || tx.payment_method;
+    }
+    return tx.crypto_currency || "Crypto";
+  };
 
   if (loading) {
     return <div className="text-center py-8">Loading transactions...</div>;
@@ -142,7 +161,8 @@ export const AdminWallets = () => {
               <TableHead className="text-foreground">User Email</TableHead>
               <TableHead className="text-foreground">Type</TableHead>
               <TableHead className="text-foreground">Amount</TableHead>
-              <TableHead className="text-foreground">Currency</TableHead>
+              <TableHead className="text-foreground">Payment Method</TableHead>
+              <TableHead className="text-foreground">Reference/Sender</TableHead>
               <TableHead className="text-foreground">Status</TableHead>
               <TableHead className="text-foreground">Date</TableHead>
               <TableHead className="text-foreground">Actions</TableHead>
@@ -151,13 +171,13 @@ export const AdminWallets = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   Loading transactions...
                 </TableCell>
               </TableRow>
             ) : transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No transactions found
                 </TableCell>
               </TableRow>
@@ -182,8 +202,28 @@ export const AdminWallets = () => {
                   <TableCell className="font-semibold text-neon-blue">
                     ${Number(transaction.amount).toFixed(2)}
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-foreground">
-                    {transaction.crypto_currency}
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={
+                        transaction.payment_method
+                          ? "bg-green-500/10 text-green-400 border-green-500/30"
+                          : "bg-orange-500/10 text-orange-400 border-orange-500/30"
+                      }
+                    >
+                      {getPaymentMethodDisplay(transaction)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                    {transaction.reference_id && (
+                      <span title={transaction.reference_id}>Ref: {transaction.reference_id}</span>
+                    )}
+                    {transaction.sender_info && (
+                      <span title={transaction.sender_info} className={transaction.reference_id ? "ml-2" : ""}>
+                        {transaction.reference_id ? "| " : ""}From: {transaction.sender_info}
+                      </span>
+                    )}
+                    {!transaction.reference_id && !transaction.sender_info && "-"}
                   </TableCell>
                   <TableCell>
                     <Badge

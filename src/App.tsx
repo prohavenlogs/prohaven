@@ -9,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Wallet from "./pages/Wallet";
 import Banks from "./pages/Banks";
@@ -39,6 +40,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
               <Route path="/banks" element={<ProtectedRoute><Banks /></ProtectedRoute>} />

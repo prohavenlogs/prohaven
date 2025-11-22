@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,21 +9,21 @@ import { toast } from "sonner";
 import { sendEmail, emailTemplates } from "@/lib/email";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import PageTransition from "@/components/PageTransition";
-import { Wallet, CheckCircle2, Mail } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const { signUpWithWallet, user, loading } = useAuth();
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
-  const { disconnect } = useDisconnect();
+  const { signUp, user, loading } = useAuth();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showWallets, setShowWallets] = useState(false);
-  const [step, setStep] = useState<"wallet" | "details" | "confirmation">("wallet");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [step, setStep] = useState<"form" | "confirmation">("form");
   const [userEmail, setUserEmail] = useState("");
 
   // Redirect if already logged in
@@ -34,34 +33,19 @@ const SignUp = () => {
     }
   }, [user, loading, navigate]);
 
-  // Move to details step when wallet is connected
-  useEffect(() => {
-    if (isConnected && address && step === "wallet") {
-      setStep("details");
-      setShowWallets(false);
-    }
-  }, [isConnected, address, step]);
-
-  const handleConnect = async (connector: any) => {
-    try {
-      connect({ connector });
-    } catch (error) {
-      console.error("Connection error:", error);
-      toast.error("Failed to connect wallet");
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!address) {
-      toast.error("Please connect your wallet first");
-      return;
-    }
+    const { fullName, email, password, confirmPassword } = formData;
 
-    const { fullName, email } = formData;
-
-    if (!fullName || !email) {
+    if (!fullName || !email || !password || !confirmPassword) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -73,17 +57,24 @@ const SignUp = () => {
       return;
     }
 
+    // Password validation
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const result = await signUpWithWallet(address, email, fullName);
+      const result = await signUp(email, password, fullName);
 
       if (result.error) {
-        if (result.error.message.includes("User already registered")) {
-          toast.error("This wallet or email is already registered");
-        } else {
-          toast.error(result.error.message);
-        }
+        toast.error(result.error.message);
       } else if (result.needsEmailConfirmation) {
         // Email confirmation required - show confirmation page
         setUserEmail(email);
@@ -92,14 +83,14 @@ const SignUp = () => {
         // Send welcome email using Resend
         try {
           const template = emailTemplates.welcome(fullName);
-          const result = await sendEmail({
+          const emailResult = await sendEmail({
             to: email,
             subject: template.subject,
             html: template.html,
           });
 
-          if (!result.success) {
-            console.error("Failed to send welcome email:", result.error);
+          if (!emailResult.success) {
+            console.error("Failed to send welcome email:", emailResult.error);
           }
         } catch (emailError) {
           console.error("Failed to send welcome email:", emailError);
@@ -108,7 +99,7 @@ const SignUp = () => {
         toast.success("Account created successfully! Welcome to ProHavenLogs.");
         navigate("/dashboard");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error("An unexpected error occurred");
       console.error("Sign up error:", error);
     } finally {
@@ -116,183 +107,16 @@ const SignUp = () => {
     }
   };
 
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  return (
-    <PageTransition>
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-lg bg-card rounded-3xl shadow-card p-8 md:p-12 border border-border/20 hover:shadow-glow transition-shadow duration-300">
-          {/* Logo */}
-          <div className="flex justify-center mb-6">
-            <Logo />
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-2xl font-semibold text-center text-card-foreground mb-4">
-            Create Your ProHavenLogs Account
-          </h1>
-
-          <p className="text-center text-sm text-muted-foreground mb-8">
-            {step === "wallet"
-              ? "Connect your Web3 wallet to get started"
-              : "Complete your profile information"}
-          </p>
-
-          {/* Step Indicator */}
-          <div className="flex items-center justify-center mb-8 space-x-4">
-            <div className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "wallet" || isConnected ? "bg-neon-blue text-white" : "bg-muted text-muted-foreground"}`}>
-                {isConnected ? <CheckCircle2 className="w-5 h-5" /> : "1"}
-              </div>
-              <span className="ml-2 text-sm text-muted-foreground">Connect Wallet</span>
+  // Email Confirmation Step
+  if (step === "confirmation") {
+    return (
+      <PageTransition>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-card rounded-3xl shadow-card p-8 md:p-12 border border-border/20 hover:shadow-glow transition-shadow duration-300">
+            <div className="flex justify-center mb-6">
+              <Logo />
             </div>
-            <div className="w-12 h-0.5 bg-border"></div>
-            <div className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "details" ? "bg-neon-blue text-white" : "bg-muted text-muted-foreground"}`}>
-                2
-              </div>
-              <span className="ml-2 text-sm text-muted-foreground">Your Details</span>
-            </div>
-          </div>
 
-          {/* Wallet Connection Step */}
-          {step === "wallet" && (
-            <div className="space-y-4">
-              {showWallets ? (
-                <div className="space-y-3">
-                  {connectors.map((connector) => (
-                    <Button
-                      key={connector.id}
-                      onClick={() => handleConnect(connector)}
-                      disabled={isConnecting}
-                      className="w-full h-12 rounded-full bg-card border border-border/40 hover:border-neon-blue/50 text-card-foreground font-semibold shadow-sm hover:shadow-glow transition-all"
-                    >
-                      {isConnecting ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        <>
-                          <Wallet className="w-5 h-5 mr-2" />
-                          {connector.name}
-                        </>
-                      )}
-                    </Button>
-                  ))}
-                  <Button
-                    onClick={() => setShowWallets(false)}
-                    variant="outline"
-                    className="w-full h-12 rounded-full"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setShowWallets(true)}
-                  disabled={isConnecting}
-                  className="w-full h-12 rounded-full gradient-primary text-black font-semibold shadow-glow disabled:opacity-50 relative overflow-hidden group"
-                >
-                  <Wallet className="w-5 h-5 mr-2" />
-                  Connect Wallet
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Details Form Step */}
-          {step === "details" && address && (
-            <div className="space-y-5">
-              {/* Connected Wallet Display */}
-              <div className="p-4 bg-muted/20 rounded-2xl border border-border/40">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
-                    <p className="text-sm font-semibold text-card-foreground">{formatAddress(address)}</p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      disconnect();
-                      setStep("wallet");
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    Change
-                  </Button>
-                </div>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Full Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-muted-foreground text-sm">
-                    Full Name
-                  </Label>
-                  <Input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    placeholder="Enter Your Full Name"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    required
-                    className="h-12 rounded-full"
-                    aria-label="Full name"
-                  />
-                </div>
-
-                {/* Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-muted-foreground text-sm">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter Email Address"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="h-12 rounded-full"
-                    aria-label="Email address"
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full h-12 rounded-full gradient-primary text-black font-semibold shadow-glow disabled:opacity-50 relative overflow-hidden group"
-                  aria-label="Create your account"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      <span className="ml-2">Creating Account...</span>
-                    </>
-                  ) : (
-                    "Create Account"
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
-                </Button>
-              </form>
-            </div>
-          )}
-
-          {/* Email Confirmation Step */}
-          {step === "confirmation" && (
             <div className="space-y-6 text-center">
               {/* Success Icon */}
               <div className="flex justify-center">
@@ -325,7 +149,7 @@ const SignUp = () => {
                 <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                   <li>Check your email inbox (and spam folder)</li>
                   <li>Click the confirmation link</li>
-                  <li>Return here and sign in with your wallet</li>
+                  <li>Return here and sign in</li>
                 </ol>
               </div>
 
@@ -343,9 +167,8 @@ const SignUp = () => {
                   Didn't receive the email?{" "}
                   <button
                     onClick={() => {
-                      setStep("details");
-                      // Don't disconnect wallet - let user retry with same wallet
-                      setFormData({ fullName: "", email: "" });
+                      setStep("form");
+                      setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
                     }}
                     className="text-neon-blue hover:text-neon-pink transition-colors"
                   >
@@ -354,20 +177,162 @@ const SignUp = () => {
                 </p>
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  return (
+    <PageTransition>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-card rounded-3xl shadow-card p-8 md:p-12 border border-border/20 hover:shadow-glow transition-shadow duration-300">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <Logo />
+          </div>
+
+          {/* Heading */}
+          <h1 className="text-2xl font-semibold text-center text-card-foreground mb-4">
+            Create Your Account
+          </h1>
+
+          <p className="text-center text-sm text-muted-foreground mb-8">
+            Fill in your details to get started
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Full Name */}
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-muted-foreground text-sm">
+                Full Name
+              </Label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                  className="h-12 rounded-full pl-12"
+                  aria-label="Full name"
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-muted-foreground text-sm">
+                Email Address
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="h-12 rounded-full pl-12"
+                  aria-label="Email address"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-muted-foreground text-sm">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  className="h-12 rounded-full pl-12 pr-12"
+                  aria-label="Password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground pl-2">
+                Must be at least 6 characters
+              </p>
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-muted-foreground text-sm">
+                Confirm Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  className="h-12 rounded-full pl-12 pr-12"
+                  aria-label="Confirm password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-12 rounded-full gradient-primary text-black font-semibold shadow-glow disabled:opacity-50 relative overflow-hidden group"
+              aria-label="Create your account"
+            >
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span className="ml-2">Creating Account...</span>
+                </>
+              ) : (
+                "Create Account"
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+            </Button>
+          </form>
 
           {/* Sign In Link */}
-          {step !== "confirmation" && (
-            <p className="text-center text-sm text-muted-foreground mt-6">
-              Already have an account?{" "}
-              <button
-                onClick={() => navigate("/")}
-                className="text-neon-blue hover:text-neon-pink transition-colors font-medium"
-              >
-                Sign In
-              </button>
-            </p>
-          )}
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Already have an account?{" "}
+            <button
+              onClick={() => navigate("/")}
+              className="text-neon-blue hover:text-neon-pink transition-colors font-medium"
+            >
+              Sign In
+            </button>
+          </p>
         </div>
       </div>
     </PageTransition>

@@ -89,15 +89,15 @@ export const emailTemplates = {
           </div>
           <div class="content">
             <h2>Hi ${fullName},</h2>
-            <p>Thank you for creating your account with your Web3 wallet!</p>
+            <p>Thank you for creating your account!</p>
             <p>Please confirm your email address to complete your registration and access all features.</p>
-            <p><strong>Important:</strong> Check your email inbox for the confirmation link from Supabase to verify your account.</p>
+            <p><strong>Important:</strong> Check your email inbox for the confirmation link to verify your account.</p>
             <p>Once confirmed, you'll be able to:</p>
             <ul>
-              <li>Link multiple wallets to your account</li>
+              <li>Add funds to your account balance</li>
               <li>Browse and purchase products</li>
               <li>Track your orders and transactions</li>
-              <li>Manage your wallet balance</li>
+              <li>Manage your account settings</li>
             </ul>
           </div>
           <div class="footer">

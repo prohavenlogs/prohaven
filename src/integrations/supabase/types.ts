@@ -282,6 +282,10 @@ export type Database = {
           crypto_currency: string
           id: string
           payment_id: string | null
+          payment_method: string | null
+          reference_id: string | null
+          proof_url: string | null
+          sender_info: string | null
           status: string
           tx_hash: string | null
           type: string
@@ -295,6 +299,10 @@ export type Database = {
           crypto_currency?: string
           id?: string
           payment_id?: string | null
+          payment_method?: string | null
+          reference_id?: string | null
+          proof_url?: string | null
+          sender_info?: string | null
           status?: string
           tx_hash?: string | null
           type: string
@@ -308,12 +316,55 @@ export type Database = {
           crypto_currency?: string
           id?: string
           payment_id?: string | null
+          payment_method?: string | null
+          reference_id?: string | null
+          proof_url?: string | null
+          sender_info?: string | null
           status?: string
           tx_hash?: string | null
           type?: string
           updated_at?: string | null
           user_id?: string
           wallet_address?: string | null
+        }
+        Relationships: []
+      }
+      payment_settings: {
+        Row: {
+          id: string
+          payment_method: string
+          account_info: string
+          display_name: string | null
+          instructions: string | null
+          is_active: boolean | null
+          min_amount: number | null
+          max_amount: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          payment_method: string
+          account_info: string
+          display_name?: string | null
+          instructions?: string | null
+          is_active?: boolean | null
+          min_amount?: number | null
+          max_amount?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          payment_method?: string
+          account_info?: string
+          display_name?: string | null
+          instructions?: string | null
+          is_active?: boolean | null
+          min_amount?: number | null
+          max_amount?: number | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -439,6 +490,17 @@ export type Database = {
       update_wallet_balance: {
         Args: { p_amount: number; p_type: string; p_user_id: string }
         Returns: undefined
+      }
+      submit_fiat_deposit: {
+        Args: {
+          p_user_id: string
+          p_amount: number
+          p_payment_method: string
+          p_reference_id?: string | null
+          p_proof_url?: string | null
+          p_sender_info?: string | null
+        }
+        Returns: Json
       }
     }
     Enums: {

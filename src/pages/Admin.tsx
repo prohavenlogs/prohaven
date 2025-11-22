@@ -64,7 +64,7 @@ const Admin = () => {
             </TabsTrigger>
             <TabsTrigger value="addresses" className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-neon-blue">
               <MapPin className="w-4 h-4" />
-              <span className="hidden sm:inline">Addresses</span>
+              <span className="hidden sm:inline">Wallet Addresses</span>
             </TabsTrigger>
           </TabsList>
 

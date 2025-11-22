@@ -1,26 +1,48 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAccount, useBalance } from "wagmi";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownCircle, ArrowUpCircle, Plus, Wallet as WalletIcon } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus, Wallet as WalletIcon, Bitcoin, CheckCircle, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import PageTransition from "@/components/PageTransition";
 import { TransactionSkeleton } from "@/components/WalletSkeleton";
-import { DepositModal } from "@/components/DepositModal";
+import { AddBalanceModal } from "@/components/AddBalanceModal";
+import { toast } from "sonner";
 
 const Wallet = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { address, isConnected } = useAccount();
   const { data: walletBalance } = useBalance({ address });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
+
+  // Handle Stripe payment redirects
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+
+    if (paymentStatus === "success") {
+      toast.success("Payment successful! Your balance has been updated.", {
+        icon: <CheckCircle className="w-5 h-5 text-green-400" />,
+        duration: 5000,
+      });
+      // Clear the URL params
+      setSearchParams({});
+    } else if (paymentStatus === "cancelled") {
+      toast.error("Payment was cancelled. No charges were made.", {
+        icon: <XCircle className="w-5 h-5 text-red-400" />,
+        duration: 5000,
+      });
+      // Clear the URL params
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   // Fetch wallet balance (only confirmed transactions)
   useEffect(() => {
@@ -128,6 +150,18 @@ const Wallet = () => {
     return status === "pending" ? "Awaiting Approval" : status;
   };
 
+  // Get payment method display info
+  const getPaymentMethodInfo = (tx: any) => {
+    const paymentMethod = tx.payment_method;
+    const cryptoCurrency = tx.crypto_currency;
+
+    // Crypto payments (from admin wallet addresses)
+    if (paymentMethod === "crypto" || cryptoCurrency) {
+      return { label: cryptoCurrency || "Crypto", icon: Bitcoin, color: "text-orange-400" };
+    }
+    return { label: "Balance", icon: WalletIcon, color: "text-muted-foreground" };
+  };
+
   return (
     <DashboardLayout balance={balance.toFixed(2)}>
       <PageTransition>
@@ -173,7 +207,7 @@ const Wallet = () => {
 
         {/* Info Alert */}
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 text-sm text-blue-400">
-          Payments are manually verified within 24 hours. For assistance, email us at{" "}
+          Card payments are credited instantly. Other payment methods are manually verified within 24 hours. For assistance, email us at{" "}
           <a href="mailto:supp.prohaven@gmail.com" className="underline hover:text-neon-pink transition-colors">
             supp.prohaven@gmail.com
           </a>.
@@ -182,7 +216,7 @@ const Wallet = () => {
         {/* Transaction History */}
         <Card className="rounded-3xl shadow-card p-8 border border-border/20">
           <h2 className="text-2xl font-bold text-card-foreground mb-6">Transaction History</h2>
-          
+
           {loading ? (
             <TransactionSkeleton />
           ) : transactions.length === 0 ? (
@@ -191,44 +225,55 @@ const Wallet = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      tx.type === "deposit" ? "bg-green-500/20" : "bg-red-500/20"
-                    }`}>
-                      {tx.type === "deposit" ? (
-                        <ArrowDownCircle className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <ArrowUpCircle className="w-5 h-5 text-red-400" />
-                      )}
+              {transactions.map((tx) => {
+                const paymentInfo = getPaymentMethodInfo(tx);
+                const PaymentIcon = paymentInfo.icon;
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        tx.type === "deposit" ? "bg-green-500/20" : "bg-red-500/20"
+                      }`}>
+                        {tx.type === "deposit" ? (
+                          <ArrowDownCircle className="w-5 h-5 text-green-400" />
+                        ) : (
+                          <ArrowUpCircle className="w-5 h-5 text-red-400" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-card-foreground capitalize">{tx.type}</p>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <PaymentIcon className={`w-3 h-3 ${paymentInfo.color}`} />
+                            <span>{paymentInfo.label}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(tx.created_at).toLocaleDateString()} {new Date(tx.created_at).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-card-foreground capitalize">{tx.type}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(tx.created_at).toLocaleDateString()} {new Date(tx.created_at).toLocaleTimeString()}
+                    <div className="text-right">
+                      <p className={`font-bold ${tx.type === "deposit" ? "text-green-400" : "text-red-400"}`}>
+                        {tx.type === "deposit" ? "+" : "-"}${parseFloat(tx.amount).toFixed(2)}
                       </p>
+                      <Badge variant="outline" className={getStatusColor(tx.status)}>
+                        {getStatusText(tx.status)}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${tx.type === "deposit" ? "text-green-400" : "text-red-400"}`}>
-                      {tx.type === "deposit" ? "+" : "-"}${parseFloat(tx.amount).toFixed(2)}
-                    </p>
-                    <Badge variant="outline" className={getStatusColor(tx.status)}>
-                      {getStatusText(tx.status)}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
         </div>
 
-        <DepositModal
+        <AddBalanceModal
           open={depositModalOpen}
           onOpenChange={setDepositModalOpen}
           onSuccess={() => {
