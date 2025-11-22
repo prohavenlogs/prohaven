@@ -1,9 +1,6 @@
-import { Resend } from 'resend';
+import { supabase } from '@/integrations/supabase/client';
 
-// Initialize Resend with API key
-const resend = new Resend(import.meta.env.VITE_RESEND_API_KEY);
-
-// Email sending function
+// Email sending function - calls Supabase Edge Function
 export async function sendEmail({
   to,
   subject,
@@ -14,16 +11,18 @@ export async function sendEmail({
   html: string;
 }) {
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'ProHavenLogs <prohavenlogs.com>', // Replace with your domain when verified
-      to,
-      subject,
-      html,
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: { to, subject, html },
     });
 
     if (error) {
       console.error('Email error:', error);
       return { success: false, error };
+    }
+
+    if (data && !data.success) {
+      console.error('Email sending failed:', data.error);
+      return { success: false, error: data.error };
     }
 
     console.log('Email sent successfully:', data);
