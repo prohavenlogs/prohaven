@@ -4,9 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Transaction {
@@ -19,6 +20,7 @@ interface Transaction {
   payment_method: string | null;
   reference_id: string | null;
   sender_info: string | null;
+  sender_address: string | null;
   status: string;
   created_at: string;
 }
@@ -113,9 +115,15 @@ export const AdminWallets = () => {
       t.crypto_currency.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.sender_address?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [transactions, searchQuery]);
+
+  // Separate pending deposits for quick access
+  const pendingDeposits = useMemo(() => {
+    return filteredTransactions.filter(t => t.type === "deposit" && t.status === "pending");
+  }, [filteredTransactions]);
 
   const getPaymentMethodDisplay = (tx: Transaction) => {
     if (tx.payment_method) {
@@ -135,24 +143,110 @@ export const AdminWallets = () => {
   }
 
   return (
-    <Card className="glass-card border-border/50 rounded-lg shadow-glow">
-      <div className="p-6 border-b border-border/50">
-        <h2 className="text-xl font-semibold text-foreground">Wallet Transactions</h2>
-        <p className="text-sm text-muted-foreground mt-1">View all wallet deposits, spends, and adjustments</p>
-        
-        <div className="mt-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search by email, ID, type, or currency..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+    <div className="space-y-6">
+      {/* Pending Deposits Alert */}
+      {pendingDeposits.length > 0 && (
+        <Card className="glass-card border-yellow-500/50 rounded-lg shadow-glow bg-yellow-500/5">
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              <h2 className="text-xl font-semibold text-foreground">
+                Pending Deposits ({pendingDeposits.length})
+              </h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              These deposits require your review and approval.
+            </p>
+
+            <div className="space-y-3">
+              {pendingDeposits.map((deposit) => (
+                <div
+                  key={deposit.id}
+                  className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/30"
+                >
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">User</p>
+                      <p className="font-medium text-foreground">{deposit.user_email}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Amount</p>
+                      <p className="font-bold text-neon-blue">${Number(deposit.amount).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Currency</p>
+                      <p className="font-medium text-orange-400">{deposit.crypto_currency}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Sender Address</p>
+                      <p className="font-mono text-xs text-foreground truncate" title={deposit.sender_address || ""}>
+                        {deposit.sender_address
+                          ? `${deposit.sender_address.slice(0, 10)}...${deposit.sender_address.slice(-8)}`
+                          : "N/A"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-green-500/50 text-green-500 hover:bg-green-500/10"
+                      onClick={() => updateTransactionStatus(deposit.id, "completed")}
+                      disabled={updatingStatus === deposit.id}
+                    >
+                      {updatingStatus === deposit.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Approve
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+                      onClick={() => updateTransactionStatus(deposit.id, "failed")}
+                      disabled={updatingStatus === deposit.id}
+                    >
+                      {updatingStatus === deposit.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Reject
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* All Transactions */}
+      <Card className="glass-card border-border/50 rounded-lg shadow-glow">
+        <div className="p-6 border-b border-border/50">
+          <h2 className="text-xl font-semibold text-foreground">All Transactions</h2>
+          <p className="text-sm text-muted-foreground mt-1">View all wallet deposits, spends, and adjustments</p>
+
+          <div className="mt-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by email, ID, type, or currency..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </div>
-      </div>
       
       <div className="overflow-x-auto">
         <Table>
@@ -214,16 +308,22 @@ export const AdminWallets = () => {
                       {getPaymentMethodDisplay(transaction)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                    {transaction.reference_id && (
-                      <span title={transaction.reference_id}>Ref: {transaction.reference_id}</span>
-                    )}
-                    {transaction.sender_info && (
-                      <span title={transaction.sender_info} className={transaction.reference_id ? "ml-2" : ""}>
-                        {transaction.reference_id ? "| " : ""}From: {transaction.sender_info}
-                      </span>
-                    )}
-                    {!transaction.reference_id && !transaction.sender_info && "-"}
+                  <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                    <div className="space-y-1">
+                      {transaction.sender_address && (
+                        <div className="truncate" title={transaction.sender_address}>
+                          <span className="text-xs text-muted-foreground">From: </span>
+                          <span className="font-mono text-xs">{transaction.sender_address.slice(0, 8)}...{transaction.sender_address.slice(-6)}</span>
+                        </div>
+                      )}
+                      {transaction.reference_id && (
+                        <div className="truncate" title={transaction.reference_id}>
+                          <span className="text-xs text-muted-foreground">Tx: </span>
+                          <span className="font-mono text-xs">{transaction.reference_id.slice(0, 12)}...</span>
+                        </div>
+                      )}
+                      {!transaction.reference_id && !transaction.sender_address && !transaction.sender_info && "-"}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -262,6 +362,7 @@ export const AdminWallets = () => {
           </TableBody>
         </Table>
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 };

@@ -34,8 +34,8 @@ interface WalletAddress {
 
 type Step = "amount" | "crypto" | "payment";
 
-const PRESET_AMOUNTS = [25, 50, 100, 250, 500];
-const MIN_AMOUNT = 10;
+const PRESET_AMOUNTS = [50, 100, 250, 500, 1000];
+const MIN_AMOUNT = 50;
 const MAX_AMOUNT = 10000;
 
 // Currency icons mapping
@@ -62,6 +62,7 @@ export const CryptoDepositModal = ({
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [copied, setCopied] = useState(false);
   const [transactionHash, setTransactionHash] = useState("");
+  const [senderAddress, setSenderAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch wallet addresses from admin
@@ -94,6 +95,7 @@ export const CryptoDepositModal = ({
       setAmount("");
       setSelectedCurrency(null);
       setTransactionHash("");
+      setSenderAddress("");
     }
   }, [open]);
 
@@ -128,6 +130,11 @@ export const CryptoDepositModal = ({
       return;
     }
 
+    if (!senderAddress.trim()) {
+      toast.error("Please enter the wallet address you sent from");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -139,6 +146,7 @@ export const CryptoDepositModal = ({
         crypto_currency: selectedCurrency.currency,
         payment_method: "crypto",
         reference_id: transactionHash || `deposit_${Date.now()}`,
+        sender_address: senderAddress.trim(),
         status: "pending",
       });
 
@@ -365,6 +373,21 @@ export const CryptoDepositModal = ({
               </div>
             </div>
 
+            {/* Sender Address (required) */}
+            <div className="space-y-2">
+              <Label htmlFor="senderAddress">Your Wallet Address (Required)</Label>
+              <Input
+                id="senderAddress"
+                placeholder="Enter the wallet address you sent from"
+                value={senderAddress}
+                onChange={(e) => setSenderAddress(e.target.value)}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the wallet address you used to send the payment.
+              </p>
+            </div>
+
             {/* Transaction Hash (optional) */}
             <div className="space-y-2">
               <Label htmlFor="txHash">Transaction Hash (Optional)</Label>
@@ -382,7 +405,7 @@ export const CryptoDepositModal = ({
 
             <Button
               onClick={handleSubmitDeposit}
-              disabled={submitting}
+              disabled={submitting || !senderAddress.trim()}
               className="w-full gradient-primary text-black font-semibold h-12"
             >
               {submitting ? (
