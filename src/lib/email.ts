@@ -15,7 +15,7 @@ export async function sendEmail({
 }) {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'ProHavenLogs <onboarding@resend.dev>', // Replace with your domain when verified
+      from: 'ProHavenLogs <prohavenlogs.com>', // Replace with your domain when verified
       to,
       subject,
       html,
