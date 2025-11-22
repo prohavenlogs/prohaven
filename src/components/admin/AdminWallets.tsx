@@ -20,7 +20,6 @@ interface Transaction {
   payment_method: string | null;
   reference_id: string | null;
   sender_info: string | null;
-  sender_address: string | null;
   status: string;
   created_at: string;
 }
@@ -115,8 +114,7 @@ export const AdminWallets = () => {
       t.crypto_currency.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.reference_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.sender_address?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.sender_info?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [transactions, searchQuery]);
 
@@ -164,7 +162,7 @@ export const AdminWallets = () => {
                   key={deposit.id}
                   className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/30"
                 >
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">User</p>
                       <p className="font-medium text-foreground">{deposit.user_email}</p>
@@ -176,15 +174,6 @@ export const AdminWallets = () => {
                     <div>
                       <p className="text-xs text-muted-foreground">Currency</p>
                       <p className="font-medium text-orange-400">{deposit.crypto_currency}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Sender Address</p>
-                      <p className="font-mono text-xs text-foreground truncate" title={deposit.sender_address || ""}>
-                        {deposit.sender_address
-                          ? `${deposit.sender_address.slice(0, 10)}...${deposit.sender_address.slice(-8)}`
-                          : "N/A"
-                        }
-                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
@@ -310,19 +299,13 @@ export const AdminWallets = () => {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-[200px]">
                     <div className="space-y-1">
-                      {transaction.sender_address && (
-                        <div className="truncate" title={transaction.sender_address}>
-                          <span className="text-xs text-muted-foreground">From: </span>
-                          <span className="font-mono text-xs">{transaction.sender_address.slice(0, 8)}...{transaction.sender_address.slice(-6)}</span>
-                        </div>
-                      )}
                       {transaction.reference_id && (
                         <div className="truncate" title={transaction.reference_id}>
                           <span className="text-xs text-muted-foreground">Tx: </span>
-                          <span className="font-mono text-xs">{transaction.reference_id.slice(0, 12)}...</span>
+                          <span className="font-mono text-xs">{transaction.reference_id.slice(0, 16)}...</span>
                         </div>
                       )}
-                      {!transaction.reference_id && !transaction.sender_address && !transaction.sender_info && "-"}
+                      {!transaction.reference_id && "-"}
                     </div>
                   </TableCell>
                   <TableCell>
