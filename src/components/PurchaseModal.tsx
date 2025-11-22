@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
-import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther, formatEther } from "viem";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Wallet, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Wallet, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
+import { sendEmail, emailTemplates } from "@/lib/email";
 
 interface PurchaseModalProps {
   open: boolean;
@@ -22,179 +19,118 @@ interface PurchaseModalProps {
   onSuccess: () => void;
 }
 
-interface WalletAddress {
-  id: string;
-  currency: string;
-  address: string;
-}
-
 export const PurchaseModal = ({
   open,
   onOpenChange,
   productName,
   productPrice,
   productId,
-  category,
   onSuccess,
 }: PurchaseModalProps) => {
   const { user } = useAuth();
-  const { address: userWallet, isConnected } = useAccount();
-  const { sendTransaction, data: hash, isPending: isSending, error: txError } = useSendTransaction();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
-
-  const [walletAddresses, setWalletAddresses] = useState<WalletAddress[]>([]);
-  const [selectedCrypto, setSelectedCrypto] = useState<string>("");
+  const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
 
-  // Fetch available wallet addresses
+  // Fetch user's current balance and profile info
   useEffect(() => {
-    const fetchAddresses = async () => {
+    const fetchUserData = async () => {
+      if (!user || !open) return;
+
+      setLoading(true);
       try {
         const { data, error } = await supabase
-          .from("wallet_addresses")
-          .select("*")
-          .order("currency");
+          .from("profiles")
+          .select("wallet_balance, email, full_name")
+          .eq("id", user.id)
+          .single();
 
         if (error) throw error;
-        setWalletAddresses(data || []);
 
-        // Auto-select Ethereum if available
-        const ethAddress = data?.find(addr => addr.currency === "Ethereum");
-        if (ethAddress) {
-          setSelectedCrypto("Ethereum");
-        } else if (data && data.length > 0) {
-          setSelectedCrypto(data[0].currency);
-        }
+        setBalance(data?.wallet_balance || 0);
+        setUserEmail(data?.email || user.email || "");
+        setUserName(data?.full_name || "Customer");
       } catch (error) {
-        console.error("Error fetching wallet addresses:", error);
-        toast.error("Failed to load payment options");
+        console.error("Error fetching user data:", error);
+        toast.error("Failed to load account information");
       } finally {
         setLoading(false);
       }
     };
 
-    if (open) {
-      fetchAddresses();
-    }
-  }, [open]);
+    fetchUserData();
+  }, [user, open]);
 
-  // Get selected wallet address
-  const selectedAddress = walletAddresses.find(addr => addr.currency === selectedCrypto);
-
-  // Calculate crypto amount (simplified conversion - in production use real-time rates)
-  const getCryptoAmount = () => {
-    if (!selectedCrypto) return "0";
-
-    const conversionRates: Record<string, number> = {
-      "Bitcoin": 65000,    // 1 BTC = $65,000
-      "Ethereum": 3000,    // 1 ETH = $3,000
-      "Litecoin": 80,      // 1 LTC = $80
-      "Solana": 150,       // 1 SOL = $150
-      "USDT": 1,           // 1 USDT = $1
-      "USDC": 1,           // 1 USDC = $1
-    };
-
-    const rate = conversionRates[selectedCrypto] || 1;
-    return (productPrice / rate).toFixed(6);
-  };
+  const hasInsufficientBalance = balance < productPrice;
 
   const handlePurchase = async () => {
-    if (!isConnected) {
-      toast.error("Please connect your wallet first");
+    if (!user) {
+      toast.error("Please sign in to continue");
       return;
     }
 
-    if (!selectedAddress) {
-      toast.error("Please select a payment method");
+    if (hasInsufficientBalance) {
+      toast.error("Insufficient balance. Please add funds to your account.");
       return;
     }
 
-    // Only Ethereum can use Web3 wallet transaction for now
-    // Other currencies will need manual payment
-    if (selectedCrypto !== "Ethereum") {
-      toast.error("Currently only Ethereum supports direct wallet payments. Please choose Ethereum.");
-      return;
-    }
+    setPurchasing(true);
 
     try {
-      const cryptoAmount = getCryptoAmount();
-
-      console.log("Initiating purchase transaction:", {
-        to: selectedAddress.address,
-        amount: cryptoAmount,
-        crypto: selectedCrypto,
-        productPrice: productPrice
+      // Call the create_purchase RPC function with 'pending' status
+      const { data, error } = await supabase.rpc("create_purchase", {
+        p_user_id: user.id,
+        p_product_id: productId,
+        p_product_name: productName,
+        p_price: productPrice,
+        p_payment_method: "balance",
+        p_status: "pending",
       });
 
-      toast.info("Opening wallet... Please approve the payment.");
+      if (error) {
+        if (error.message?.includes("INSUFFICIENT_FUNDS")) {
+          toast.error("Insufficient balance. Please add funds to your account.");
+        } else {
+          throw error;
+        }
+        return;
+      }
 
-      sendTransaction({
-        to: selectedAddress.address as `0x${string}`,
-        value: parseEther(cryptoAmount),
-      });
-    } catch (error) {
-      console.error("Error preparing transaction:", error);
-      toast.error("Failed to prepare transaction");
+      const result = data as { order_id: string; order_number: string; success: boolean };
+
+      // Send invoice email
+      if (userEmail) {
+        const invoiceEmail = emailTemplates.invoice(
+          userName,
+          result.order_number,
+          productName,
+          productPrice
+        );
+
+        sendEmail({
+          to: userEmail,
+          subject: invoiceEmail.subject,
+          html: invoiceEmail.html,
+        }).catch((emailError) => {
+          console.error("Failed to send invoice email:", emailError);
+          // Don't fail the purchase if email fails
+        });
+      }
+
+      toast.success(`Purchase successful! Order #${result.order_number}`);
+      onSuccess();
+      handleClose();
+    } catch (error: any) {
+      console.error("Error processing purchase:", error);
+      toast.error(error?.message || "Failed to process purchase");
+    } finally {
+      setPurchasing(false);
     }
   };
 
-  // Handle transaction errors
-  useEffect(() => {
-    if (txError) {
-      console.error("Transaction error:", txError);
-      toast.error(txError.message || "Transaction failed");
-    }
-  }, [txError]);
-
-  // Handle transaction sent
-  useEffect(() => {
-    if (hash && !isSending) {
-      toast.success("Transaction sent! Waiting for confirmation...");
-    }
-  }, [hash, isSending]);
-
-  // Handle transaction confirmation
-  useEffect(() => {
-    if (isConfirmed && hash) {
-      const recordPurchase = async () => {
-        try {
-          // Create order via RPC (same as before, but with crypto payment)
-          const { data, error } = await supabase.rpc("create_purchase", {
-            p_user_id: user?.id,
-            p_product_id: productId,
-            p_product_name: productName,
-            p_price: productPrice,
-            p_payment_method: `crypto_${selectedCrypto}`,
-          });
-
-          if (error) throw error;
-
-          // Record the crypto transaction
-          await supabase.from("transactions").insert({
-            user_id: user?.id,
-            type: "purchase",
-            amount: productPrice,
-            crypto_currency: selectedCrypto,
-            status: "completed",
-            transaction_hash: hash,
-          });
-
-          const result = data as { order_id: string; order_number: string; success: boolean };
-          toast.success(`Purchase successful! Order #${result.order_number}`);
-          onSuccess();
-          handleClose();
-        } catch (error) {
-          console.error("Error recording purchase:", error);
-          toast.error("Transaction confirmed but failed to record order");
-        }
-      };
-
-      recordPurchase();
-    }
-  }, [isConfirmed, hash, user, productId, productName, productPrice, selectedCrypto, onSuccess]);
-
   const handleClose = () => {
-    setSelectedCrypto("");
     onOpenChange(false);
   };
 
@@ -215,65 +151,50 @@ export const PurchaseModal = ({
             </div>
           </Card>
 
-          {/* Payment Method Selection */}
           {loading ? (
             <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-blue mx-auto"></div>
+              <Loader2 className="w-8 h-8 animate-spin text-neon-blue mx-auto" />
+              <p className="text-sm text-muted-foreground mt-2">Loading account info...</p>
             </div>
-          ) : walletAddresses.length === 0 ? (
-            <Alert className="border-yellow-500/30 bg-yellow-500/10">
-              <AlertTriangle className="h-4 w-4 text-yellow-400" />
-              <AlertDescription className="text-yellow-400 text-sm">
-                No payment methods available. Please contact support.
-              </AlertDescription>
-            </Alert>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="crypto">Select Payment Method</Label>
-                <Select value={selectedCrypto} onValueChange={setSelectedCrypto}>
-                  <SelectTrigger id="crypto">
-                    <SelectValue placeholder="Choose cryptocurrency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {walletAddresses.map((addr) => (
-                      <SelectItem key={addr.id} value={addr.currency}>
-                        {addr.currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Balance Info */}
+              <div className="p-4 rounded-lg border border-border/30 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-neon-blue" />
+                    <span className="text-sm text-muted-foreground">Your Balance</span>
+                  </div>
+                  <span className={`text-xl font-bold ${hasInsufficientBalance ? "text-red-400" : "text-neon-blue"}`}>
+                    ${balance.toFixed(2)}
+                  </span>
+                </div>
+                {!hasInsufficientBalance && (
+                  <div className="mt-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">After purchase:</span>
+                      <span className="font-semibold text-foreground">
+                        ${(balance - productPrice).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Payment Amount */}
-              {selectedAddress && (
-                <div className="p-4 rounded-lg border border-border/30 bg-muted/20">
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">You will pay</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {getCryptoAmount()} {selectedCrypto}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono break-all">
-                      To: {selectedAddress.address}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Wallet Status */}
-              {!isConnected ? (
-                <Alert className="border-yellow-500/30 bg-yellow-500/10">
-                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                  <AlertDescription className="text-yellow-400 text-sm">
-                    Please connect your wallet to complete this purchase
+              {/* Balance Status */}
+              {hasInsufficientBalance ? (
+                <Alert className="border-red-500/30 bg-red-500/10">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-400 text-sm">
+                    Insufficient balance. You need ${(productPrice - balance).toFixed(2)} more to complete this purchase.
+                    Please add funds to your wallet.
                   </AlertDescription>
                 </Alert>
               ) : (
                 <Alert className="border-green-500/30 bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <AlertDescription className="text-green-400 text-sm flex items-center gap-2">
-                    <Wallet className="w-4 h-4" />
-                    Wallet connected: {userWallet?.slice(0, 6)}...{userWallet?.slice(-4)}
+                  <AlertDescription className="text-green-400 text-sm">
+                    You have sufficient balance to complete this purchase.
                   </AlertDescription>
                 </Alert>
               )}
@@ -283,9 +204,9 @@ export const PurchaseModal = ({
                 <AlertDescription className="text-sm text-muted-foreground">
                   <p className="font-semibold mb-1">Note:</p>
                   <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>Payment will be sent directly from your wallet</li>
-                    <li>Your order will be processed after transaction confirmation</li>
-                    <li>Make sure you have enough {selectedCrypto} + gas fees</li>
+                    <li>Your balance will be deducted immediately</li>
+                    <li>An invoice will be sent to your email</li>
+                    <li>Order status will be set to pending for processing</li>
                   </ul>
                 </AlertDescription>
               </Alert>
@@ -294,15 +215,24 @@ export const PurchaseModal = ({
               <div className="grid gap-2">
                 <Button
                   onClick={handlePurchase}
-                  disabled={!isConnected || isSending || isConfirming || !selectedAddress}
+                  disabled={hasInsufficientBalance || purchasing}
                   className="w-full gradient-primary text-black font-semibold"
                 >
-                  {isSending ? "Opening Wallet..." : isConfirming ? "Confirming..." : "Pay Now"}
+                  {purchasing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : hasInsufficientBalance ? (
+                    "Insufficient Balance"
+                  ) : (
+                    `Pay $${productPrice.toFixed(2)}`
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleClose}
-                  disabled={isSending || isConfirming}
+                  disabled={purchasing}
                   className="w-full"
                 >
                   Cancel
