@@ -14,12 +14,12 @@ interface Deposit {
   id: string;
   user_id: string;
   user_email?: string;
-  type: string;
   amount: number;
   crypto_currency: string;
-  reference_id: string | null;
+  payment_id: string | null;
   status: string;
   created_at: string;
+  wallet_address: string | null;
 }
 
 export const AdminWallets = () => {
@@ -36,17 +36,16 @@ export const AdminWallets = () => {
 
   const fetchDeposits = async () => {
     try {
-      // Fetch only deposit transactions
-      const { data: txData, error: txError } = await supabase
-        .from("transactions")
+      // Fetch from deposits table
+      const { data: depositData, error: depositError } = await supabase
+        .from("deposits")
         .select("*")
-        .eq("type", "deposit")
         .order("created_at", { ascending: false });
 
-      if (txError) throw txError;
+      if (depositError) throw depositError;
 
       // Fetch all unique user emails
-      const userIds = [...new Set(txData?.map(t => t.user_id) || [])];
+      const userIds = [...new Set(depositData?.map(d => d.user_id) || [])];
 
       if (userIds.length > 0) {
         const { data: profiles, error: profileError } = await supabase
@@ -58,14 +57,14 @@ export const AdminWallets = () => {
 
         // Map emails to deposits
         const emailMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
-        const depositsWithEmail = txData?.map(t => ({
-          ...t,
-          user_email: emailMap.get(t.user_id) || "N/A"
+        const depositsWithEmail = depositData?.map(d => ({
+          ...d,
+          user_email: emailMap.get(d.user_id) || "N/A"
         })) || [];
 
         setDeposits(depositsWithEmail);
       } else {
-        setDeposits([]);
+        setDeposits(depositData || []);
       }
     } catch (error) {
       console.error("Error fetching deposits:", error);
@@ -80,27 +79,64 @@ export const AdminWallets = () => {
 
     setUpdatingStatus(depositId);
     try {
-      const { data, error } = await supabase.rpc("admin_set_transaction_status", {
-        p_tx_id: depositId,
-        p_new_status: newStatus,
-        p_admin_id: user.id,
-      });
-
-      if (error) {
-        if (error.message?.includes("PERMISSION_DENIED")) {
-          toast.error("You don't have permission to perform this action");
-        } else if (error.message?.includes("INSUFFICIENT_BALANCE_TO_REVERSE")) {
-          toast.error("Cannot reverse deposit - user has insufficient balance");
-        } else {
-          throw error;
-        }
+      // Get the deposit details first
+      const deposit = deposits.find(d => d.id === depositId);
+      if (!deposit) {
+        toast.error("Deposit not found");
         return;
       }
 
-      const result = data as { success: boolean; old_status: string; new_status: string };
-      toast.success(`Deposit status changed from ${result.old_status} to ${result.new_status}`);
+      const oldStatus = deposit.status;
 
-      // Refetch deposits to ensure balance is reflected correctly
+      // Update deposit status
+      const { error: updateError } = await supabase
+        .from("deposits")
+        .update({ status: newStatus })
+        .eq("id", depositId);
+
+      if (updateError) throw updateError;
+
+      // Handle balance updates
+      if (oldStatus !== "completed" && newStatus === "completed") {
+        // Approving: credit user's balance
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_balance")
+          .eq("id", deposit.user_id)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from("profiles")
+            .update({ wallet_balance: (profile.wallet_balance || 0) + deposit.amount })
+            .eq("id", deposit.user_id);
+        }
+      } else if (oldStatus === "completed" && newStatus !== "completed") {
+        // Reversing: debit user's balance
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_balance")
+          .eq("id", deposit.user_id)
+          .single();
+
+        if (profile && profile.wallet_balance >= deposit.amount) {
+          await supabase
+            .from("profiles")
+            .update({ wallet_balance: profile.wallet_balance - deposit.amount })
+            .eq("id", deposit.user_id);
+        }
+      }
+
+      // Log admin action
+      await supabase.from("admin_actions_log").insert({
+        admin_id: user.id,
+        action_type: "update_deposit_status",
+        affected_table: "deposits",
+        affected_id: depositId,
+        note: `Changed deposit status from ${oldStatus} to ${newStatus}`,
+      });
+
+      toast.success(`Deposit ${newStatus === "completed" ? "approved" : newStatus === "failed" ? "rejected" : "updated"}`);
       fetchDeposits();
     } catch (error) {
       console.error("Error updating deposit status:", error);
@@ -117,7 +153,7 @@ export const AdminWallets = () => {
         deposit.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         deposit.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         deposit.crypto_currency?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        deposit.reference_id?.toLowerCase().includes(searchQuery.toLowerCase());
+        deposit.payment_id?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || deposit.status === statusFilter;
 
@@ -139,7 +175,7 @@ export const AdminWallets = () => {
 
     return (
       <Badge variant="outline" className={variants[status] || "bg-gray-500/20 text-gray-400"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status === "completed" ? "Approved" : status === "failed" ? "Rejected" : status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
@@ -273,7 +309,7 @@ export const AdminWallets = () => {
                 <TableHead className="text-foreground">User Email</TableHead>
                 <TableHead className="text-foreground">Amount</TableHead>
                 <TableHead className="text-foreground">Currency</TableHead>
-                <TableHead className="text-foreground">Reference</TableHead>
+                <TableHead className="text-foreground">Tx Hash</TableHead>
                 <TableHead className="text-foreground">Status</TableHead>
                 <TableHead className="text-foreground">Date</TableHead>
                 <TableHead className="text-foreground">Actions</TableHead>
@@ -304,9 +340,9 @@ export const AdminWallets = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px]">
-                      {deposit.reference_id ? (
-                        <div className="truncate" title={deposit.reference_id}>
-                          <span className="font-mono text-xs">{deposit.reference_id.slice(0, 20)}...</span>
+                      {deposit.payment_id ? (
+                        <div className="truncate" title={deposit.payment_id}>
+                          <span className="font-mono text-xs">{deposit.payment_id.slice(0, 20)}...</span>
                         </div>
                       ) : (
                         "-"

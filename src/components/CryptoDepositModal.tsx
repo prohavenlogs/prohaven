@@ -131,19 +131,18 @@ export const CryptoDepositModal = ({
     setSubmitting(true);
 
     try {
-      // Create a pending transaction record
+      // Create a pending deposit record
       const insertData = {
         user_id: user.id,
-        type: "deposit",
         amount: parseFloat(amount),
         crypto_currency: selectedCurrency.currency,
-        reference_id: transactionHash || `deposit_${Date.now()}`,
+        payment_id: transactionHash || null,
         status: "pending",
       };
 
-      console.log("Inserting transaction:", insertData);
+      console.log("Inserting deposit:", insertData);
 
-      const { data, error } = await supabase.from("transactions").insert(insertData).select();
+      const { data, error } = await supabase.from("deposits").insert(insertData).select();
 
       if (error) {
         console.error("Supabase error:", error);
