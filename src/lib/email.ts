@@ -1,4 +1,6 @@
-// Email sending function - calls Resend API directly
+import { supabase } from '@/integrations/supabase/client';
+
+// Email sending function - calls Supabase Database Function (pg_net -> Resend API)
 export async function sendEmail({
   to,
   subject,
@@ -12,32 +14,20 @@ export async function sendEmail({
     console.log('Attempting to send email to:', to);
     console.log('Subject:', subject);
 
-    const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
-
-    if (!RESEND_API_KEY) {
-      console.error('VITE_RESEND_API_KEY not configured');
-      return { success: false, error: 'Resend API key not configured' };
-    }
-
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'ProHavenLogs <noreply@prohavenlogs.com>',
-        to: [to],
-        subject,
-        html,
-      }),
+    const { data, error } = await (supabase.rpc as any)('send_invoice_email', {
+      p_to: to,
+      p_subject: subject,
+      p_html: html,
     });
 
-    const data = await response.json();
+    if (error) {
+      console.error('Email error:', error);
+      return { success: false, error };
+    }
 
-    if (!response.ok) {
-      console.error('Resend API error:', data);
-      return { success: false, error: data };
+    if (data && !data.success) {
+      console.error('Email sending failed:', data.error);
+      return { success: false, error: data.error };
     }
 
     console.log('Email sent successfully:', data);
