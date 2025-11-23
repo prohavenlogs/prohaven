@@ -134,6 +134,7 @@ export const CryptoDepositModal = ({
       // Create a pending deposit record
       const insertData = {
         user_id: user.id,
+        user_email: user.email,
         amount: parseFloat(amount),
         crypto_currency: selectedCurrency.currency,
         payment_id: transactionHash || null,

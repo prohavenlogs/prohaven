@@ -13,7 +13,7 @@ import { toast } from "sonner";
 interface Deposit {
   id: string;
   user_id: string;
-  user_email?: string;
+  user_email: string | null;
   amount: number;
   crypto_currency: string;
   payment_id: string | null;
@@ -36,40 +36,21 @@ export const AdminWallets = () => {
 
   const fetchDeposits = async () => {
     try {
-      console.log("Fetching deposits...");
-
       // Fetch from deposits table
       const { data: depositData, error: depositError } = await supabase
         .from("deposits")
         .select("*")
         .order("created_at", { ascending: false });
 
-      console.log("Deposits response:", { data: depositData, error: depositError });
-
       if (depositError) throw depositError;
 
-      // Fetch all unique user emails
-      const userIds = [...new Set(depositData?.map(d => d.user_id) || [])];
+      // Map deposits with email (user_email is now stored directly in deposits table)
+      const depositsWithEmail = depositData?.map(d => ({
+        ...d,
+        user_email: d.user_email || "N/A"
+      })) || [];
 
-      if (userIds.length > 0) {
-        const { data: profiles, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, email")
-          .in("id", userIds);
-
-        if (profileError) throw profileError;
-
-        // Map emails to deposits
-        const emailMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
-        const depositsWithEmail = depositData?.map(d => ({
-          ...d,
-          user_email: emailMap.get(d.user_id) || "N/A"
-        })) || [];
-
-        setDeposits(depositsWithEmail);
-      } else {
-        setDeposits(depositData || []);
-      }
+      setDeposits(depositsWithEmail);
     } catch (error) {
       console.error("Error fetching deposits:", error);
       toast.error("Failed to fetch deposits");
