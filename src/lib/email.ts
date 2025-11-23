@@ -281,6 +281,129 @@ export const emailTemplates = {
     `,
   }),
 
+  orderApproved: (customerName: string, orderNumber: string, productName: string, amount: number, orderDate: string) => ({
+    subject: `🎉 Order Approved - ${orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Order Approved</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0f0f23;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f0f23; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                      <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Order Approved!</h1>
+                      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your order has been processed successfully</p>
+                    </td>
+                  </tr>
+
+                  <!-- Content -->
+                  <tr>
+                    <td style="background-color: #1a1a2e; padding: 40px 30px;">
+                      <p style="color: #e2e8f0; font-size: 16px; margin: 0 0 25px 0;">
+                        Hi <strong style="color: #10b981;">${customerName}</strong>,
+                      </p>
+                      <p style="color: #a0aec0; font-size: 15px; margin: 0 0 30px 0; line-height: 1.6;">
+                        Great news! Your order has been approved and is ready. Below are your order details.
+                      </p>
+
+                      <!-- Invoice Box -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; overflow: hidden;">
+                        <tr>
+                          <td style="padding: 25px;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td colspan="2" style="padding-bottom: 20px; border-bottom: 1px solid rgba(16, 185, 129, 0.2);">
+                                  <p style="color: #10b981; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 5px 0;">Invoice</p>
+                                  <p style="color: #ffffff; font-size: 18px; font-weight: 600; margin: 0;">${orderNumber}</p>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                  <p style="color: #a0aec0; font-size: 13px; margin: 0;">Product</p>
+                                  <p style="color: #ffffff; font-size: 15px; font-weight: 500; margin: 5px 0 0 0;">${productName}</p>
+                                </td>
+                                <td style="padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                                  <p style="color: #a0aec0; font-size: 13px; margin: 0;">Date</p>
+                                  <p style="color: #ffffff; font-size: 15px; margin: 5px 0 0 0;">${orderDate}</p>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                  <p style="color: #a0aec0; font-size: 13px; margin: 0;">Payment Method</p>
+                                  <p style="color: #ffffff; font-size: 15px; margin: 5px 0 0 0;">Account Balance</p>
+                                </td>
+                                <td style="padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                                  <p style="color: #a0aec0; font-size: 13px; margin: 0;">Status</p>
+                                  <span style="display: inline-block; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">Completed</span>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding: 20px 0 0 0;">
+                                  <p style="color: #a0aec0; font-size: 13px; margin: 0;">Total Amount</p>
+                                </td>
+                                <td style="padding: 20px 0 0 0; text-align: right;">
+                                  <p style="color: #10b981; font-size: 28px; font-weight: 700; margin: 0;">$${amount.toFixed(2)}</p>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Info Box -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 25px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px;">
+                        <tr>
+                          <td style="padding: 15px 20px;">
+                            <p style="color: #818cf8; font-size: 14px; margin: 0; line-height: 1.5;">
+                              📦 Your product details are now available in your dashboard. Log in to view and access your purchase.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- CTA Button -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
+                        <tr>
+                          <td align="center">
+                            <a href="https://prohavenlogs.com/orders" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">View My Orders</a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background-color: #16162a; padding: 30px; border-radius: 0 0 16px 16px; text-align: center;">
+                      <p style="color: #10b981; font-size: 18px; font-weight: 700; margin: 0 0 5px 0;">ProHavenLogs</p>
+                      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px 0;">Premium Digital Products</p>
+                      <p style="color: #475569; font-size: 12px; margin: 0; line-height: 1.6;">
+                        Thank you for your purchase!<br>
+                        If you have any questions, contact our support team.
+                      </p>
+                      <p style="color: #334155; font-size: 11px; margin: 20px 0 0 0;">
+                        © ${new Date().getFullYear()} ProHavenLogs. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `,
+  }),
+
   passwordReset: (resetLink: string) => ({
     subject: 'Reset Your ProHavenLogs Password',
     html: `

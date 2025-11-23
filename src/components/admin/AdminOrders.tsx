@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, X, Search, AlertCircle, Loader2, Package } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendEmail, emailTemplates } from "@/lib/email";
 
 interface Order {
   id: string;
@@ -72,6 +73,9 @@ export const AdminOrders = () => {
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdatingOrder(orderId);
     try {
+      // Get the order details first for email
+      const order = orders.find(o => o.id === orderId);
+
       const { error } = await supabase
         .from("orders")
         .update({ status: newStatus })
@@ -87,6 +91,33 @@ export const AdminOrders = () => {
         affected_id: orderId,
         note: `Changed order status to ${newStatus}`,
       });
+
+      // Send invoice email when order is approved (completed)
+      if (newStatus === "completed" && order?.user_email && order.user_email !== "N/A") {
+        const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        const emailContent = emailTemplates.orderApproved(
+          order.user_email.split('@')[0], // Use email prefix as name
+          order.order_number,
+          order.product_name,
+          Number(order.amount),
+          orderDate
+        );
+
+        sendEmail({
+          to: order.user_email,
+          subject: emailContent.subject,
+          html: emailContent.html,
+        }).then(() => {
+          console.log("Order approval email sent successfully");
+        }).catch((emailError) => {
+          console.error("Failed to send order approval email:", emailError);
+        });
+      }
 
       toast.success(`Order status updated to ${newStatus}`);
       fetchOrders();
