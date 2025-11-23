@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -24,38 +25,37 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY is not configured");
     }
 
+    const resend = new Resend(RESEND_API_KEY);
+
     const { to, subject, html }: EmailRequest = await req.json();
 
     if (!to || !subject || !html) {
       throw new Error("Missing required fields: to, subject, html");
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "ProHavenLogs <noreply@prohavenlogs.com>",
-        to,
-        subject,
-        html,
-      }),
+    console.log("Sending email to:", to);
+    console.log("From: noreply@prohavenlogs.com");
+    console.log("Subject:", subject);
+
+    const { data, error } = await resend.emails.send({
+      from: "ProHavenLogs <noreply@prohavenlogs.com>",
+      to: [to],
+      subject,
+      html,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Resend API error:", data);
+    if (error) {
+      console.error("Resend SDK error:", error);
       return new Response(
-        JSON.stringify({ success: false, error: data }),
+        JSON.stringify({ success: false, error }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    console.log("Email sent successfully:", data);
 
     return new Response(
       JSON.stringify({ success: true, data }),

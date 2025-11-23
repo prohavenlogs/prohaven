@@ -93,30 +93,46 @@ export const AdminOrders = () => {
       });
 
       // Send invoice email when order is approved (completed)
-      if (newStatus === "completed" && order?.user_email && order.user_email !== "N/A") {
-        const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
+      if (newStatus === "completed" && order) {
+        let customerEmail = order.user_email;
 
-        const emailContent = emailTemplates.orderApproved(
-          order.user_email.split('@')[0], // Use email prefix as name
-          order.order_number,
-          order.product_name,
-          Number(order.amount),
-          orderDate
-        );
+        // If email is N/A, try to fetch from auth.users via RPC
+        if (!customerEmail || customerEmail === "N/A") {
+          const { data: emailData } = await (supabase.rpc as any)("get_user_email", {
+            user_id: order.user_id
+          });
+          customerEmail = emailData;
+        }
 
-        sendEmail({
-          to: order.user_email,
-          subject: emailContent.subject,
-          html: emailContent.html,
-        }).then(() => {
-          console.log("Order approval email sent successfully");
-        }).catch((emailError) => {
-          console.error("Failed to send order approval email:", emailError);
-        });
+        console.log("Sending order approval email to:", customerEmail);
+
+        if (customerEmail && customerEmail !== "N/A") {
+          const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+
+          const emailContent = emailTemplates.orderApproved(
+            customerEmail.split('@')[0], // Use email prefix as name
+            order.order_number,
+            order.product_name,
+            Number(order.amount),
+            orderDate
+          );
+
+          sendEmail({
+            to: customerEmail,
+            subject: emailContent.subject,
+            html: emailContent.html,
+          }).then((result) => {
+            console.log("Order approval email result:", result);
+          }).catch((emailError) => {
+            console.error("Failed to send order approval email:", emailError);
+          });
+        } else {
+          console.error("No email found for user:", order.user_id);
+        }
       }
 
       toast.success(`Order status updated to ${newStatus}`);

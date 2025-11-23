@@ -11,17 +11,22 @@ export async function sendEmail({
   html: string;
 }) {
   try {
+    console.log('Attempting to send email to:', to);
+    console.log('Subject:', subject);
+
     const { data, error } = await supabase.functions.invoke('send-email', {
       body: { to, subject, html },
     });
 
     if (error) {
       console.error('Email error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return { success: false, error };
     }
 
     if (data && !data.success) {
       console.error('Email sending failed:', data.error);
+      console.error('Full response:', JSON.stringify(data, null, 2));
       return { success: false, error: data.error };
     }
 
@@ -29,6 +34,7 @@ export async function sendEmail({
     return { success: true, data };
   } catch (error) {
     console.error('Email sending failed:', error);
+    console.error('Catch error details:', JSON.stringify(error, null, 2));
     return { success: false, error };
   }
 }
