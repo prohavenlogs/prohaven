@@ -36,11 +36,15 @@ export const AdminWallets = () => {
 
   const fetchDeposits = async () => {
     try {
+      console.log("Fetching deposits...");
+
       // Fetch from deposits table
       const { data: depositData, error: depositError } = await supabase
         .from("deposits")
         .select("*")
         .order("created_at", { ascending: false });
+
+      console.log("Deposits response:", { data: depositData, error: depositError });
 
       if (depositError) throw depositError;
 
