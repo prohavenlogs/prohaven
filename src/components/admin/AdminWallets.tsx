@@ -73,13 +73,21 @@ export const AdminWallets = () => {
 
       const oldStatus = deposit.status;
 
-      // Update deposit status
+      // Update deposit status in deposits table
       const { error: updateError } = await supabase
         .from("deposits")
         .update({ status: newStatus })
         .eq("id", depositId);
 
       if (updateError) throw updateError;
+
+      // Also update the corresponding transaction in transactions table
+      // (linked via payment_id = deposit.id)
+      await supabase
+        .from("transactions")
+        .update({ status: newStatus })
+        .eq("payment_id", depositId)
+        .eq("type", "deposit");
 
       // Handle balance updates
       if (oldStatus !== "completed" && newStatus === "completed") {

@@ -65,6 +65,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error };
       }
 
+      // Check if email already exists (Supabase returns empty identities when email exists with confirmation enabled)
+      if (data?.user?.identities?.length === 0) {
+        return {
+          error: {
+            message: "This email is already registered. Please sign in instead."
+          }
+        };
+      }
+
       // Create/update profile
       if (data?.user) {
         await supabase.from('profiles').upsert({
