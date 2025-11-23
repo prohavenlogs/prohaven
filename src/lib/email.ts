@@ -1,6 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
-
-// Email sending function - calls Supabase Edge Function
+// Email sending function - calls Resend API directly
 export async function sendEmail({
   to,
   subject,
@@ -14,27 +12,38 @@ export async function sendEmail({
     console.log('Attempting to send email to:', to);
     console.log('Subject:', subject);
 
-    const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, html },
-    });
+    const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
 
-    if (error) {
-      console.error('Email error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      return { success: false, error };
+    if (!RESEND_API_KEY) {
+      console.error('VITE_RESEND_API_KEY not configured');
+      return { success: false, error: 'Resend API key not configured' };
     }
 
-    if (data && !data.success) {
-      console.error('Email sending failed:', data.error);
-      console.error('Full response:', JSON.stringify(data, null, 2));
-      return { success: false, error: data.error };
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'ProHavenLogs <noreply@prohavenlogs.com>',
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Resend API error:', data);
+      return { success: false, error: data };
     }
 
     console.log('Email sent successfully:', data);
     return { success: true, data };
   } catch (error) {
     console.error('Email sending failed:', error);
-    console.error('Catch error details:', JSON.stringify(error, null, 2));
     return { success: false, error };
   }
 }
