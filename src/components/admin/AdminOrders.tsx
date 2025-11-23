@@ -92,6 +92,25 @@ export const AdminOrders = () => {
         note: `Changed order status to ${newStatus}`,
       });
 
+      // Refund balance when order is cancelled/rejected
+      if (newStatus === "cancelled" && order) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_balance")
+          .eq("id", order.user_id)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from("profiles")
+            .update({ wallet_balance: (profile.wallet_balance || 0) + Number(order.amount) })
+            .eq("id", order.user_id);
+
+          console.log(`Refunded $${order.amount} to user ${order.user_id}`);
+          toast.success(`Refunded $${Number(order.amount).toFixed(2)} to user's balance`);
+        }
+      }
+
       // Send invoice email when order is approved (completed)
       if (newStatus === "completed" && order) {
         let customerEmail = order.user_email;
