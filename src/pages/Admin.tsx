@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, MapPin, BarChart3, ShoppingCart, ArrowDownCircle } from "lucide-react";
+import { Shield, MapPin, BarChart3, ShoppingCart, ArrowDownCircle, Package } from "lucide-react";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminWallets } from "@/components/admin/AdminWallets";
 import { AdminWalletAddresses } from "@/components/admin/AdminWalletAddresses";
 import { AdminOrders } from "@/components/admin/AdminOrders";
+import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import LogoutButton from "@/components/LogoutButton";
 
@@ -49,10 +50,14 @@ const Admin = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="glass-card p-2 w-full grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-border/50">
+          <TabsList className="glass-card p-2 w-full grid grid-cols-2 md:grid-cols-5 gap-2 rounded-lg border border-border/50">
             <TabsTrigger value="dashboard" className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-neon-blue">
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-neon-blue">
+              <Package className="w-4 h-4" />
+              <span className="hidden sm:inline">Products</span>
             </TabsTrigger>
             <TabsTrigger value="orders" className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-neon-blue">
               <ShoppingCart className="w-4 h-4" />
@@ -70,6 +75,10 @@ const Admin = () => {
 
           <TabsContent value="dashboard" className="m-0">
             <AdminDashboard />
+          </TabsContent>
+
+          <TabsContent value="products" className="m-0">
+            <AdminProducts />
           </TabsContent>
 
           <TabsContent value="orders" className="m-0">
