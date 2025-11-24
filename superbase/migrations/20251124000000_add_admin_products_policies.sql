@@ -1,7 +1,12 @@
 -- Add RLS policies for admin to manage products
 
--- Drop existing policy for authenticated users
+-- Drop all existing policies for products table
 DROP POLICY IF EXISTS "Authenticated users can view products" ON public.products;
+DROP POLICY IF EXISTS "Authenticated users can view active products" ON public.products;
+DROP POLICY IF EXISTS "Admins can view all products" ON public.products;
+DROP POLICY IF EXISTS "Admins can insert products" ON public.products;
+DROP POLICY IF EXISTS "Admins can update products" ON public.products;
+DROP POLICY IF EXISTS "Admins can delete products" ON public.products;
 
 -- Create new policy for all authenticated users to view active products
 CREATE POLICY "Authenticated users can view active products"
