@@ -4,11 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import LogoutButton from "./LogoutButton";
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Activity, 
-  User, 
+import {
+  LayoutDashboard,
+  Wallet,
+  Activity,
   ShoppingBag,
   ChevronDown,
   ChevronUp,
@@ -181,15 +180,6 @@ const LeftSidebar = ({ isOpen = true, onClose, isMobile = false }: LeftSidebarPr
                 >
                   <ShoppingBag className="w-5 h-5" />
                   <span>My Orders</span>
-                </NavLink>
-
-                <NavLink
-                  to="/profile"
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-foreground hover:bg-muted/30 transition-all duration-200 hover:scale-105"
-                  activeClassName="gradient-primary text-black font-medium shadow-glow"
-                >
-                  <User className="w-5 h-5" />
-                  <span>My Profile</span>
                 </NavLink>
               </div>
             )}

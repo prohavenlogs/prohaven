@@ -13,12 +13,10 @@ import {
   Info,
   Loader2,
   Bitcoin,
-  QrCode,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { QRCodeSVG } from "qrcode.react";
 
 interface CryptoDepositModalProps {
   open: boolean;
@@ -340,7 +338,7 @@ export const CryptoDepositModal = ({
         <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/40">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-              <QrCode className="w-6 h-6 text-neon-blue" />
+              <Bitcoin className="w-6 h-6 text-orange-400" />
               Send Payment
             </DialogTitle>
           </DialogHeader>
@@ -357,11 +355,6 @@ export const CryptoDepositModal = ({
                 Send exactly ${amount} worth of {selectedCurrency.currency} to the address below.
               </AlertDescription>
             </Alert>
-
-            {/* QR Code */}
-            <div className="flex justify-center p-4 bg-white rounded-lg">
-              <QRCodeSVG value={selectedCurrency.address} size={180} />
-            </div>
 
             {/* Currency info */}
             <Card className="p-4 bg-orange-500/10 border-orange-500/30">
