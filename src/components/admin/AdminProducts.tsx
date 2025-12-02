@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Save, Plus, Trash2, Edit, Package } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 interface Product {
   id: string;
@@ -46,8 +47,105 @@ const initialFormData: ProductFormData = {
   active: true,
 };
 
+const ProductFormFields = ({
+  formData,
+  onInputChange
+}: {
+  formData: ProductFormData;
+  onInputChange: (field: keyof ProductFormData, value: string | boolean) => void;
+}) => (
+  <div className="space-y-4">
+    <div className="space-y-2">
+      <Label htmlFor="name">Product Name *</Label>
+      <Input
+        id="name"
+        placeholder="Enter product name"
+        value={formData.name}
+        onChange={(e) => onInputChange("name", e.target.value)}
+      />
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="category">Category *</Label>
+      <Select value={formData.category} onValueChange={(value) => onInputChange("category", value)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select category" />
+        </SelectTrigger>
+        <SelectContent>
+          {CATEGORIES.map((cat) => (
+            <SelectItem key={cat} value={cat}>
+              {cat}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="description">Description</Label>
+      <Textarea
+        id="description"
+        placeholder="Enter product description"
+        value={formData.description}
+        onChange={(e) => onInputChange("description", e.target.value)}
+        rows={3}
+      />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label htmlFor="balance_label">Balance Label</Label>
+        <Input
+          id="balance_label"
+          placeholder="e.g., $75,000"
+          value={formData.balance_label}
+          onChange={(e) => onInputChange("balance_label", e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="price_label">Price Label</Label>
+        <Input
+          id="price_label"
+          placeholder="e.g., $300"
+          value={formData.price_label}
+          onChange={(e) => onInputChange("price_label", e.target.value)}
+        />
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="price">Price (USD) *</Label>
+      <Input
+        id="price"
+        type="number"
+        step="0.01"
+        min="0"
+        placeholder="Enter price"
+        value={formData.price}
+        onChange={(e) => onInputChange("price", e.target.value)}
+      />
+    </div>
+
+    <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+      <div className="space-y-0.5">
+        <Label htmlFor="active">Active Status</Label>
+        <p className="text-xs text-muted-foreground">
+          {formData.active ? "Product is visible to users" : "Product is hidden from users"}
+        </p>
+      </div>
+      <Switch
+        id="active"
+        checked={formData.active}
+        onCheckedChange={(checked) => onInputChange("active", checked)}
+      />
+    </div>
+  </div>
+);
+
 export const AdminProducts = () => {
   const { user } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdminCheck();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -76,13 +174,20 @@ export const AdminProducts = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Check admin status when it's loaded
+    if (!adminLoading && !isAdmin) {
+      console.warn("WARNING: Current user is not an admin!");
+      toast.error("You need admin privileges to manage products");
+    }
+  }, [isAdmin, adminLoading]);
+
   const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .order("category")
-        .order("name");
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setProducts(data || []);
@@ -133,7 +238,10 @@ export const AdminProducts = () => {
         active: formData.active,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Detailed error:", error);
+        throw error;
+      }
 
       await supabase.from("admin_actions_log").insert({
         admin_id: user?.id,
@@ -146,9 +254,10 @@ export const AdminProducts = () => {
       resetForm();
       setIsAddDialogOpen(false);
       await fetchProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding product:", error);
-      toast.error("Failed to add product");
+      const errorMessage = error?.message || "Failed to add product";
+      toast.error(errorMessage);
     }
   };
 
@@ -264,100 +373,20 @@ export const AdminProducts = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const ProductFormFields = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Product Name *</Label>
-        <Input
-          id="name"
-          placeholder="Enter product name"
-          value={formData.name}
-          onChange={(e) => handleInputChange("name", e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="category">Category *</Label>
-        <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          placeholder="Enter product description"
-          value={formData.description}
-          onChange={(e) => handleInputChange("description", e.target.value)}
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="balance_label">Balance Label</Label>
-          <Input
-            id="balance_label"
-            placeholder="e.g., $75,000"
-            value={formData.balance_label}
-            onChange={(e) => handleInputChange("balance_label", e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="price_label">Price Label</Label>
-          <Input
-            id="price_label"
-            placeholder="e.g., $300"
-            value={formData.price_label}
-            onChange={(e) => handleInputChange("price_label", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="price">Price (USD) *</Label>
-        <Input
-          id="price"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="Enter price"
-          value={formData.price}
-          onChange={(e) => handleInputChange("price", e.target.value)}
-        />
-      </div>
-
-      <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
-        <div className="space-y-0.5">
-          <Label htmlFor="active">Active Status</Label>
-          <p className="text-xs text-muted-foreground">
-            {formData.active ? "Product is visible to users" : "Product is hidden from users"}
-          </p>
-        </div>
-        <Switch
-          id="active"
-          checked={formData.active}
-          onCheckedChange={(checked) => handleInputChange("active", checked)}
-        />
-      </div>
-    </div>
-  );
-
-  if (loading) {
+  if (loading || adminLoading) {
     return (
       <Card className="glass-card border-border/50 p-8">
-        <div className="text-center text-muted-foreground">Loading products...</div>
+        <div className="text-center text-muted-foreground">Loading...</div>
+      </Card>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <Card className="glass-card border-border/50 p-8">
+        <div className="text-center text-muted-foreground">
+          Access denied. Admin privileges required.
+        </div>
       </Card>
     );
   }
@@ -387,7 +416,7 @@ export const AdminProducts = () => {
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold">Add New Product</DialogTitle>
               </DialogHeader>
-              <ProductFormFields />
+              <ProductFormFields formData={formData} onInputChange={handleInputChange} />
               <Button onClick={addNewProduct} className="w-full gradient-primary text-black font-semibold">
                 Add Product
               </Button>
@@ -431,7 +460,7 @@ export const AdminProducts = () => {
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Edit Product</DialogTitle>
           </DialogHeader>
-          <ProductFormFields />
+          <ProductFormFields formData={formData} onInputChange={handleInputChange} />
           <Button onClick={updateProduct} className="w-full gradient-primary text-black font-semibold">
             Update Product
           </Button>
